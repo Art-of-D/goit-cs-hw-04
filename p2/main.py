@@ -1,27 +1,45 @@
 import os
-import sys
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(current_dir, '../utils/'))
-from utils import search_keywords
-from multiprocessing import Process, Manager
+from multiprocessing import Process, Pipe
 import time
+import logging
+
+def search_keywords(file_path, keywords, connection):
+    try:
+        found_keywords = []
+        with open(file_path, 'r') as file:
+            content = file.read()
+            for keyword in keywords:
+                amount = content.count(keyword)
+                if amount > 0:
+                    found_keywords.append(keyword)
+        connection.send((file_path, found_keywords))
+        connection.close()
+    except Exception as e:
+        logging.error(f"Processing {file_path}: {str(e)}")
 
 # Main function
 def main(files, keywords):
     start_time = time.time()
-    manager = Manager()
-    results = manager.list()
+    parent_connections = []
+    processes = []
 
     # Creating processes
-    processes = []
-    for i, file_path in enumerate(files):
-        process = Process(target=search_keywords, args=(i, file_path, keywords, results))
-        process.start()
-        processes.append(process)
+    for file_path in files:
+        parent_conn, child_conn = Pipe()
+        pr = Process(target=search_keywords, args=(file_path, keywords, child_conn))
+        pr.start()
+        processes.append(pr)
+        parent_connections.append(parent_conn)
+
+    # Collect results from pipes
+    results = {}
+    for parent_conn in parent_connections:
+        file_path, found_keywords = parent_conn.recv()
+        for keyword in found_keywords:
+            results.setdefault(keyword, []).append(file_path)
 
     # Wait for all processes
-    for process in processes:
-        process.join()
+    [pr.join() for pr in processes]
 
     end_time = time.time()
     execution_time = end_time - start_time
@@ -42,5 +60,5 @@ if __name__ == "__main__":
 
     results = main(files, keywords)
     print("Results:")
-    for result in results:
-        print(result)
+    for keyword, found_files in results.items():
+        print(f"Keyword '{keyword}' found in files: {found_files}")

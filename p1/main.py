@@ -11,18 +11,17 @@ import time
 # Main fucntion
 def main(files, keywords):
     start_time = time.time()
-    results = []
+    results = {}
 
     # Creating threads
     threads = []
     for i in range(len(files)):
-        thread = Thread(target=search_keywords, args=(i, files[i], keywords, results))
+        thread = Thread(target=search_keywords, args=(files[i], keywords, results))
         thread.start()
         threads.append(thread)
 
     # Wait for all threads
-    for thread in threads:
-        thread.join()
+    [str.join() for str in threads]
 
     end_time = time.time()
     execution_time = end_time - start_time
@@ -43,5 +42,5 @@ if __name__ == "__main__":
 
     results = main(files, keywords)
     print("Results:")
-    for result in results:
-        print(result)
+    for keyword, found_files in results.items():
+        print(f"Keyword '{keyword}' found in files: {found_files}")
